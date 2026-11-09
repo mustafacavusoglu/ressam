@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ressam ortam testi</title>
+<style>
+  html,body{margin:0;height:100%;background:#111;color:#eee;font:13px/1.4 system-ui,sans-serif;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh}
+  #ui{position:fixed;top:8px;left:8px;display:flex;gap:6px;align-items:center;background:rgba(0,0,0,.55);padding:6px 8px;border-radius:6px}
+  select,button{font:inherit;min-height:32px}
+  #info{white-space:pre;font-family:ui-monospace,monospace}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <select id="place"></select>
+  <select id="time"></select>
+  <button id="wide">Geniş</button>
+  <button id="front">Karşıdan</button>
+  <span id="info"></span>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { PLACES, TIMES, buildEnvironment } from "./js/environments.js";
+
+const $ = (id) => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ canvas: $("c"), antialias: true });
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.05, 4000);
+const controls = new OrbitControls(camera, renderer.domElement);
+function wide() { camera.position.set(1.8, 1.55, 3.1); controls.target.set(-0.15, 1.15, 0.25); controls.update(); }
+function front() { camera.position.set(0, 1.25, 2.2); controls.target.set(0, 1.25, 0); controls.update(); }
+wide();
+$("wide").onclick = wide; $("front").onclick = front;
+
+// stand-in easel + painter capsule
+const wood = new THREE.MeshStandardMaterial({ color: "#8a5a34", roughness: 0.65 });
+const easel = new THREE.Group(); scene.add(easel);
+const canvasM = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.75, 0.03), new THREE.MeshStandardMaterial({ color: "#efe8da", roughness: 0.92 }));
+canvasM.position.set(0, 1.2, 0); easel.add(canvasM);
+for (const [x, z, rx, rz] of [[-0.35, -0.05, -0.04, -0.06], [0.35, -0.05, -0.04, 0.06], [0, -0.42, 0.32, 0]]) {
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.045, 1.9, 0.035), wood); leg.position.set(x, 0.92, z); leg.rotation.set(rx, 0, rz); easel.add(leg);
+}
+const painter = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.32, 6, 16), new THREE.MeshStandardMaterial({ color: "#6b7fa3", roughness: 0.7 }));
+painter.position.set(-0.3, 0.86, 0.5); scene.add(painter);
+scene.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+
+for (const p of PLACES) $("place").add(new Option(p.label, p.id));
+for (const t of TIMES) $("time").add(new Option(t.label, t.id));
+const qs = new URLSearchParams(location.search);
+$("place").value = qs.get("place") || "forest"; $("time").value = qs.get("time") || "noon";
+
+let env = null, busy = false, lastBuild = 0;
+async function rebuild() {
+  if (busy) return; busy = true;
+  env?.dispose(); env = null;
+  const t0 = performance.now();
+  try {
+    env = await buildEnvironment({ scene, renderer, place: $("place").value, time: $("time").value });
+    lastBuild = Math.round(performance.now() - t0);
+    renderer.toneMappingExposure = env.exposure ?? 1;
+  } finally { busy = false; }
+}
+$("place").onchange = rebuild; $("time").onchange = rebuild;
+window.__env = { rebuild, renderer, scene, camera, get env() { return env; }, get lastBuild() { return lastBuild; }, wide, front, setSel(p, t) { $("place").value = p; $("time").value = t; return rebuild(); } };
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h;
+  camera.fov = w >= h ? 34 : 52; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize); resize();
+
+const clock = new THREE.Clock();
+let frames = 0, acc = 0, fps = 0;
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
+  env?.update(dt, t);
+  renderer.render(scene, camera);
+  frames++; acc += dt;
+  if (acc >= 0.5) {
+    fps = frames / acc; frames = 0; acc = 0;
+    const m = renderer.info.memory, r = renderer.info.render;
+    $("info").textContent = `${fps.toFixed(0)} fps · build ${lastBuild} ms · geo ${m.geometries} tex ${m.textures} · calls ${r.calls} · tris ${(r.triangles / 1000).toFixed(0)}k`;
+    window.__fps = fps;
+  }
+  requestAnimationFrame(loop);
+}
+rebuild().then(loop);
+</script>
+</body>
+</html>

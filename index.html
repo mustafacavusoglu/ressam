@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="tr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ressam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f6f1e9; --card:#fffdf9; --ink:#2a2420; --muted:#7a6e63; --line:#e6ddd0;
+  --accent:#d9643a; --accent-ink:#ffffff; --accent-soft:#fbe6dc; --field:#fbf7f1;
+  --shadow:0 1px 2px rgba(60,40,20,.06),0 8px 28px rgba(60,40,20,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#1b1714; --card:#25201c; --ink:#f3ece4; --muted:#a8998b; --line:#3a332d;
+    --accent:#ef7d52; --accent-ink:#1b1714; --accent-soft:#3b2a22; --field:#2c2621;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#1b1714; --card:#25201c; --ink:#f3ece4; --muted:#a8998b; --line:#3a332d;
+  --accent:#ef7d52; --accent-ink:#1b1714; --accent-soft:#3b2a22; --field:#2c2621;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;
+  padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+header h1{font:700 30px/1.1 Fraunces,Georgia,serif;margin:0;letter-spacing:-.01em}
+header p{margin:2px 0 0;color:var(--muted)}
+header .grow{flex:1}
+.layout{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+.viewer{padding:10px;position:relative}
+.screen{background:#1b1714;border-radius:12px;overflow:hidden;display:flex;justify-content:center;align-items:center}
+canvas#out{display:block;width:auto;height:auto;max-width:100%;max-height:72vh}
+.status{display:flex;align-items:center;gap:10px;padding:10px 6px 2px;min-height:40px}
+#msg{margin:0;color:var(--muted);flex:1}
+progress{appearance:none;width:100%;height:6px;border:0;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 2px}
+progress::-webkit-progress-bar{background:var(--line)}
+progress::-webkit-progress-value{background:var(--accent);border-radius:99px}
+progress::-moz-progress-bar{background:var(--accent)}
+.panel{padding:18px;display:flex;flex-direction:column;gap:18px}
+.step h2{font:600 12px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+select{font:inherit;font-size:15px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;
+  min-height:44px;padding:0 10px;width:100%}
+.btn{font:inherit;font-weight:600;min-height:46px;padding:0 18px;border-radius:12px;border:1px solid var(--line);
+  background:var(--field);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  transition:transform .08s ease,background .15s ease}
+.btn:hover:not(:disabled){background:var(--accent-soft)}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.primary:hover:not(:disabled){filter:brightness(1.05);background:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.small{width:auto;min-height:40px;padding:0 14px;font-weight:500}
+.btn:focus-visible,select:focus-visible,.file:focus-visible + .btn{outline:3px solid var(--accent);outline-offset:2px}
+.actions{display:flex;flex-direction:column;gap:10px}
+.file{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+.note{font-size:13px;color:var(--muted);margin:0}
+[hidden]{display:none!important}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="grow">
+      <h1>Ressam</h1>
+      <p>Fotoğrafını seç; ressam onu seçtiğin yerde, sıfırdan boyasın.</p>
+    </div>
+    <button class="btn small" id="theme" type="button" aria-label="Açık/koyu tema">☾ Koyu</button>
+  </header>
+
+  <div class="layout">
+    <section class="card viewer" aria-label="Sahne">
+      <div class="screen"><canvas id="out" width="1280" height="720" role="img" aria-label="Ressamın tuvale resim yaptığı 3B sahne"></canvas></div>
+      <progress id="bar" max="1" value="0" hidden></progress>
+      <div class="status"><p id="msg" role="status" aria-live="polite">Dünya yükleniyor…</p></div>
+    </section>
+
+    <aside class="card panel" aria-label="Ayarlar">
+      <div class="step">
+        <h2>1 · Fotoğraf</h2>
+        <input class="file" type="file" id="file" accept="image/*">
+        <label class="btn primary" for="file" id="pick">Fotoğraf seç</label>
+      </div>
+      <div class="step">
+        <h2>2 · Nerede, ne zaman</h2>
+        <div class="grid2">
+          <label class="f">Mekan <select id="place"></select></label>
+          <label class="f">Saat <select id="time"></select></label>
+        </div>
+      </div>
+      <div class="step">
+        <h2>3 · Video</h2>
+        <div class="grid2">
+          <label class="f">Süre
+            <select id="dur">
+              <option value="12">12 sn</option>
+              <option value="20" selected>20 sn</option>
+              <option value="40">40 sn</option>
+              <option value="60">60 sn</option>
+            </select>
+          </label>
+          <label class="f">Detay
+            <select id="detail">
+              <option value="3">Düşük</option>
+              <option value="4" selected>Orta</option>
+              <option value="5">Yüksek</option>
+            </select>
+          </label>
+          <label class="f" style="grid-column:1/-1">Biçim
+            <select id="format">
+              <option value="auto" selected>Otomatik</option>
+              <option value="land">Yatay 16:9</option>
+              <option value="port">Dikey 9:16</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="play" disabled>Oynat</button>
+        <button class="btn primary" id="rec" disabled>Videoyu kaydet</button>
+        <button class="btn primary" id="save" hidden>Videoyu indir</button>
+        <button class="btn primary" id="savePic" hidden>Tabloyu indir (PNG)</button>
+        <p class="note">Kayıt, animasyon oynarken gerçek zamanlı alınır; bitene kadar sekmeyi açık tut.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
